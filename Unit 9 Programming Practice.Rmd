@@ -1,0 +1,124 @@
+---
+title: 'Unit 09: Programming Practice'
+author: "Diogo Viveiros"
+date: "2025-10-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+
+## Question 3
+
+# 3.1
+
+```{r}
+ rmystery <- function(n){
+  x = runif(n)
+  y = runif(n, min=0, max = 1/x)
+  data.frame(x=x,y=y)
+}
+plot(rmystery(100))
+```
+```{r}
+experiment_m <- function(){
+  df <- rmystery(100)
+  reg <- lm(y ~ x, data = df)
+  slope <- coef(reg)[2]
+  return(slope)
+}
+
+```
+
+
+```{r}
+slopes_m <- replicate(1000, experiment_m())
+
+hist(slopes_m, breaks = seq(min(slopes_m), max(slopes_m))
+```
+
+
+
+#3.3
+
+```{r}
+renigma <- function(n){
+  x = runif(n)
+  y = runif(n, min=0, max = (1-x)^2)
+  data.frame(x=x,y=y)
+}
+plot(renigma(100))
+```
+
+```{r}
+experiment_e <- function(){
+  df <- renigma(100)
+  reg <- lm(y ~ x, data = df)
+  slope <- coef(reg)[2]
+  return(slope)
+}
+```
+
+
+
+```{r}
+slopes_e <- replicate(1000, experiment_e())
+
+hist(slopes_e, breaks = seq(min(slopes_e), max(slopes_e))
+```
+
+## Question 4
+
+```{r}
+library("fec16")
+data("results_house")
+data("campaigns")
+```
+
+```{r}
+df_q4 <- inner_join(results_house, campaigns, by = "cand_id")
+```
+Need to do some validation here later
+
+```{r}
+ggplot(data = df_q4, aes(x = general_percent)) +
+  geom_histogram()
+
+ggplot(data = df_q4, aes(x = ttl_disb)) +
+  geom_histogram()
+```
+
+Office Hours:
+
+If worried about skewness for the statistic you're running, do a log-transform. ( I think in Q4.5?)
+
+Checking for collinearity: run cor(); remove one of the collinear variables and then compare the coefficiencts to check if they're the same after running one and removing the other. 
+
+Last two parts of question 4
+
+Use coeftest(model_x, vcovHC(model_x)) in library(sandwich) and some other library to evaluate robust standard errors. 
+
+Set either Republican or Democrat as the baseline, not the "other" label
+
+Run an f test that compares the last two models you create. 
+
+```{r}
+library(stargazer)
+```
+
+
+```{r, results='asis'}
+stargazer(
+  model_1,
+  model_2,
+  model_3,
+  type = 'latex'
+)
+```
+
