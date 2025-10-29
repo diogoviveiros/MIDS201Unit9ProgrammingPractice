@@ -2,7 +2,9 @@
 title: 'Unit 09: Programming Practice'
 author: "Diogo Viveiros"
 date: "2025-10-25"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -14,9 +16,9 @@ library(dplyr)
 library(ggplot2)
 ```
 
-## Question 3
+# Question 3
 
-# 3.1
+## Question 3.1
 
 ```{r}
  rmystery <- function(n){
@@ -36,16 +38,20 @@ experiment_m <- function(){
 
 ```
 
+```{r}
+df_q3 <- data.frame()
+```
 
 ```{r}
-slopes_m <- replicate(1000, experiment_m())
-
-hist(slopes_m, breaks = seq(min(slopes_m), max(slopes_m))
+slopes_m <- replicate(10000, experiment_m())
+df_q3.1 <- data.frame(slopes = slopes_m)
+ggplot(data = df_q3.1, aes(x = slopes)) +
+  geom_histogram()
 ```
 
 
 
-#3.3
+## Question 3.3
 
 ```{r}
 renigma <- function(n){
@@ -69,11 +75,13 @@ experiment_e <- function(){
 
 ```{r}
 slopes_e <- replicate(1000, experiment_e())
-
-hist(slopes_e, breaks = seq(min(slopes_e), max(slopes_e))
+df_q3.3 <- data.frame(slopes = slopes_e)
+ggplot(data = df_q3.3, aes(x = slopes)) +
+  geom_histogram()
+#hist(slopes_e, breaks = seq(min(slopes_e), max(slopes_e))
 ```
 
-## Question 4
+# Question 4
 
 ```{r}
 library("fec16")
@@ -81,20 +89,125 @@ data("results_house")
 data("campaigns")
 ```
 
+## Question 4.1
+
+```{r}
+ggplot(data = results_house, aes(x = general_percent)) +
+  geom_histogram()
+
+ggplot(data = campaigns, aes(x = ttl_disb)) +
+  geom_histogram(bins = 10)
+```
+
+# Questions 4.2/4.3
+
 ```{r}
 df_q4 <- inner_join(results_house, campaigns, by = "cand_id")
 ```
-Need to do some validation here later
+
+## Question 4.4
 
 ```{r}
-ggplot(data = df_q4, aes(x = general_percent)) +
-  geom_histogram()
+df_q4 <- df_q4 %>%
+  mutate(
+    candidate_party = case_when(
+      party == "DEM" ~ "Democrat",
+      party == "REP" ~ "Republican",
+      TRUE ~ "Other Party"
+    )
+  )
+```
 
-ggplot(data = df_q4, aes(x = ttl_disb)) +
+
+```{r}
+ggplot(data = df_q4, aes(x = ttl_disb, y=general_votes, color = candidate_party)) +
+  geom_point() +
+  labs(
+       x = "Total Disbursement Spending",
+       y = "General Votes")+
+  ggtitle("Total Spending Disbursement vs General Votes (by Party)") +
+  theme(plot.title = element_text(size = 8, face = "bold"))
+```
+
+
+## Question 4.5
+
+## Large-Sample Assumptions
+
+### I.I.D. Data:
+The data are independently and identically distributed, as each observation is drawn from the same underlying distribution of candidates. Each candidate’s campaign information is independent of others, meaning that observing one campaign does not directly inform the outcomes of another.
+
+### Existence of the Best Linear Predictor (BLP):
+The covariance terms need to be finite, so we should avoid heavy tails. However, based on the distribution observed in Question 4.1, the variable ttl_disb exhibits a very heavy tail. I am going to apply a log transformation ttl_disb in order to smooth out the tails and better satisfy the assumption that there are no infinite variances. There are a lot of values of 0 though, which would be undefined, so we're setting those to 1 with the log1p function.
+
+```{r}
+df_q4$log_ttl_disb <- log1p(df_q4$ttl_disb)
+ggplot(data = df_q4, aes(x = log_ttl_disb)) +
   geom_histogram()
 ```
 
-Office Hours:
+## Uniqueness of the BLP:
+There is no perfect collinearity among the regressors to make E[X^TX] invertible. In other words, no explanatory variable can be expressed as a linear combination of the others.
+To verify this, a correlation test was conducted between ttl_disb and general_votes, yielding a correlation coefficient of 0.40. This indicates that there is no perfect collinearity, so the log of ttl_disb cannot be written as a linear combination of general_votes, and vice versa.  
+
+```{r}
+cor(df_q4$log_ttl_disb, df_q4$general_votes, use = "complete.obs")
+```
+
+
+```{r}
+model_1 <- lm(general_votes ~ log_ttl_disb + candidate_party , data = df_q4)
+model_1
+```
+
+## Question 4.6
+
+```{r}
+library(stargazer)
+library(sandwich)
+library(lmtest)
+```
+```{r}
+robust_se <- coeftest(model_1, vcov = vcovHC(model_1))[, "Std. Error"]
+```
+
+```{r, results='asis'}
+stargazer(
+  model_1,
+  type = 'latex',
+  title = "Campaign Spending Effects on General Election Votes By Party",
+  se = list(robust_se),
+  covariate.labels = c(
+    "Log Effect of Campaign Spending", 
+    "Vote Difference for Other Parties (vs. Democrats)",
+    "Vote Difference for Republicans (vs. Democrats)",
+    "Baseline Vote Count (Democrat) with No Campaign Spending"
+  )
+)
+```
+
+## Question 4.7
+
+
+
+```{r}
+model_2 <- lm(general_votes ~ ttl_disb , data = df_q4)
+model_2
+anova(model_2, model_1, test = "F")
+```
+
+## Question 4.8
+
+```{r}
+model_3 <- lm(general_votes ~ candidate_party , data = df_q4)
+model_3
+anova(model_3, model_1, test = "F")
+```
+```{r}
+coeftest(model_1, vcov = vcovHC(model_1))
+```
+
+## Office Hours:
 
 If worried about skewness for the statistic you're running, do a log-transform. ( I think in Q4.5?)
 
@@ -107,18 +220,3 @@ Use coeftest(model_x, vcovHC(model_x)) in library(sandwich) and some other libra
 Set either Republican or Democrat as the baseline, not the "other" label
 
 Run an f test that compares the last two models you create. 
-
-```{r}
-library(stargazer)
-```
-
-
-```{r, results='asis'}
-stargazer(
-  model_1,
-  model_2,
-  model_3,
-  type = 'latex'
-)
-```
-
